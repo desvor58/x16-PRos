@@ -333,11 +333,14 @@ chmod +x build-linux.sh
 > FOR ADVANSED USERS
 > build-linux have special flags:
 > ```
-> -quiet            - disable all script messages, but not disable nasm's warnings and errors
-> -no-music         - do not add music files in system build
-> -no-txt           - do not add text files in system build
-> -no-boot-recomp   - do not compiling bootloader, in system build using old compiled bootloader from bin/ directory
-> -no-kernel-recomp - do not compiling kernel, in system build using old compiled kernel from bin/ directory
+> -quiet              - disable all script messages, but not disable nasm's warnings and errors
+> -no-music           - do not add music files in system build
+> -no-txt             - do not add text files in system build
+> -no-boot-recomp     - do not compiling bootloader, in system build using old compiled bootloader from bin/ directory
+> -no-kernel-recomp   - do not compiling kernel, in system build using old compiled kernel from bin/ directory
+> -no-programs-recomp - do not compiling programs, in system builf using old compiled programs from bin/ directory
+> -no-logo-display    - disable logo display when you start os
+> -no-setup           - disable setuping
 > ```
 
 ### Build Output
