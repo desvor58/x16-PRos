@@ -62,7 +62,10 @@ MouseCallback:
     push cs
     pop ds
 
+    cmp byte [CursorVisible], 0
+    je .skip_hide_at_entry
     call HideCursor
+.skip_hide_at_entry:
 
     mov al, [bp + 12]
     mov bl, al
@@ -114,6 +117,10 @@ MouseCallback:
 
     mov al, [ButtonStatus]
     and al, 0x01
+
+    cmp byte [SelEnabled], 0
+    je .draw_cursor_and_exit        ; selection disabled — skip all selection logic
+
     mov ah, [PrevLMB]
     mov [PrevLMB], al
 
@@ -160,10 +167,13 @@ MouseCallback:
     call DrawSelection
 
 .draw_cursor_and_exit:
+    cmp byte [CursorVisible], 0
+    je .silent_exit
     call SaveBackground
     mov si, mousebmp
     mov al, 0x0F
     call DrawCursor
+.silent_exit:
 
     pop ds
     pop es
@@ -446,6 +456,18 @@ HideCursor:
     call RestoreBackground
     ret
 
+; ShowCursor -- Re-display the cursor at the current MouseX/MouseY by
+; re-saving the background under it and drawing the sprite. Use this
+; after manually calling HideCursor and toggling CursorVisible back to 1.
+ShowCursor:
+    pusha
+    call SaveBackground
+    mov si, mousebmp
+    mov al, 0x0F
+    call DrawCursor
+    popa
+    ret
+
 noMouse:
     ret
 
@@ -487,6 +509,7 @@ MouseCol     dw 0
 MouseRow     dw 0
 
 PrevLMB      db 0
+CursorVisible db 1
 
 SelStartRow  dw 0
 SelStartCol  dw 0
@@ -496,6 +519,7 @@ SelEndCol    dw 0
 
 SelActive    db 0
 SelDrawn     db 0
+SelEnabled   db 1            ; 1 = drag-select rectangle enabled, 0 = disabled
 
 mousebmp:
     db 0b10000000

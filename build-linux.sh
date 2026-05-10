@@ -370,6 +370,7 @@ programs=(
     "programs/clock.asm CLOCK.BIN"
     "programs/mandel.asm MANDEL.BIN"
     "programs/tetris.asm TETRIS.BIN"
+    "programs/tetris-df.asm TETRIS2.BIN"
     "programs/chars.asm CHARS.BIN"
     "programs/eye.asm EYE.BIN"
     "programs/ed.asm ED.BIN"
@@ -379,6 +380,7 @@ programs=(
     "programs/tree.asm TREE.BIN"
     "programs/print.asm PRINT.BIN"
     "programs/calendar.asm CALENDAR.BIN"
+    "programs/settings.asm SETTINGS.BIN"
 )
 
 for prog in "${programs[@]}"; do

@@ -84,6 +84,7 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 - **Multiple disk support**: detect/list available drives and switch drives in the terminal
 - **cp866 fonts support**: change system font using config or TUI application
 - **Timezones support**: change your time zone via TIMEZONE.CFG
+- **AND MUCH MORE FEATURES**
 
 ---
 
@@ -265,7 +266,7 @@ x16-PRos includes a comprehensive collection of built-in applications:
 <td width="33%" align="center">
     <br>
     <b>And more...</b><br>
-    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM
+    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM, CALENDAR.BIN
   </td>
 </tr>
 </table>

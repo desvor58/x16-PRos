@@ -566,6 +566,24 @@ setup:
     mov ah, 0x0A
     int 0x22
 
+    ;mov ah, 0x06
+    ;int 0x21
+
+    ;mov al, 0x01
+    ;call set_background_color
+
+    ;call draw_top_and_bottom_lines
+
+    mov al, SETUP_STAGE_END
+    call setup_draw_stage_ui
+
+    mov dh, 3
+    mov dl, 0
+    call string_move_cursor
+    mov ah, 0x01
+    mov si, setup_help_msg8
+    int 0x21
+
     mov dh, 28
     mov dl, 0
     call string_move_cursor

@@ -99,6 +99,22 @@ setup_help_msg7       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '  [4] Ocean Deep (blue aqua theme)     ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
 
+setup_help_msg8       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
+                      db 0xBA, ' Before you start                      ', 0xBA, 10, 13
+                      db 0xBA, ' Familiarize yourself with the layout: ', 0xBA, 10, 13
+                      db 0xBA, 39 dup(0xC4), 0xBA, 10, 13
+                      db 0xBA, ' BIN.DIR/    - basic .BIN programs     ', 0xBA, 10, 13
+                      db 0xBA, ' COM.DIR/    - MS-DOS .COM programs    ', 0xBA, 10, 13
+                      db 0xBA, ' EXE.DIR/    - MS-DOS .EXE programs    ', 0xBA, 10, 13
+                      db 0xBA, ' PLE.DIR/    - PRos Large Executables  ', 0xBA, 10, 13
+                      db 0xBA, ' CONF.DIR/   - system config files     ', 0xBA, 10, 13
+                      db 0xBA, ' DOCS.DIR/   - documentation (.TXT)    ', 0xBA, 10, 13
+                      db 0xBA, ' BMP.DIR/    - bitmap images (.BMP)    ', 0xBA, 10, 13
+                      db 0xBA, ' FONTS.DIR/  - bitmap fonts (.FNT)     ', 0xBA, 10, 13
+                      db 0xBA, ' THEMES.DIR/ - color themes (.THM)     ', 0xBA, 10, 13
+                      db 0xBA, ' MUSIC.DIR/  - music (.IMF, .WAV)      ', 0xBA, 10, 13
+                      db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
+
 setup_program_prompt  db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, ' Enter your choice (1-3):              ', 0xBA, 10, 13
                       db 0xBA, '    _______________________________    ', 0xBA, 10, 13

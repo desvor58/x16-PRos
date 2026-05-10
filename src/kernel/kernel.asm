@@ -2309,7 +2309,7 @@ view_string    db 'VIEW', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
-terry_string  db 'TERRY', 0
+terry_string   db 'TERRY', 0
 
 autocomplete_cmd_table:
     dw exit_string, help_string, info_string, cls_string
