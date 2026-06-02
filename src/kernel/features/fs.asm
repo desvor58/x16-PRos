@@ -9,6 +9,8 @@
 ; In its current form, most of the functions have been completely 
 ; or almost completely redesigned, but I still express my 
 ; enormous gratitude to MikeOS
+;
+; Copyright (C) 2006-2014 MikeOS Developers (https://github.com/mig-hub/mikeOS/blob/master/doc/LICENSE.TXT)
 ; ==================================================================
 
 ; =======================================================================

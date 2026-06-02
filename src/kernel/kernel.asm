@@ -565,6 +565,10 @@ get_cmd:
     call string_string_compare
     jc near cd_command
 
+    mov di, bg_string
+    call string_string_compare
+    jc near bg_command
+
     mov di, terry_string
     call string_string_compare
     jc near rip_terry
@@ -846,50 +850,70 @@ get_cmd:
     jmp get_cmd
 
 .load_ple_program:
-    ; Try to load PLE from current directory
+    ; Try to load PLE from current directory (only if file exists here)
     mov ax, command
+    call fs_file_exists
+    jc .try_ple_dir
+    mov ax, command
+    mov bl, 0x01                  ; show splash
     call ple_execute
     jnc get_cmd
+    jmp total_fail
 
-    ; If not found, try /BIN.DIR on current drive
+.try_ple_dir:
+    ; If not found, try /PLE.DIR on current drive
     call save_current_dir
     mov byte [current_directory], 0
     mov word [current_dir_cluster], 0
 
-    mov ax, bin_dir_name
+    mov ax, ple_dir_name
     call fs_change_directory
     jc .restore_and_try_a_ple
 
     mov ax, command
-    call ple_execute
-    jnc .restore_and_done_ple
+    call fs_file_exists
+    jc .restore_and_try_a_ple
+
+    ; Load while still in PLE.DIR, then restore working dir before running
+    mov ax, command
+    call ple_load
+    jc .restore_and_try_a_ple
+    call restore_current_dir
+    mov bl, 0x01                  ; show splash
+    call ple_run_loaded
+    jmp get_cmd
 
 .restore_and_try_a_ple:
     call restore_current_dir
     cmp byte [current_drive_char], 'A'
     je total_fail
 
-    ; Try A:/BIN.DIR
+    ; Try A:/PLE.DIR
     call save_current_dir
     mov al, 'A'
     call fs_change_drive_letter
     jc .restore_and_fail_a_ple
 
-    mov ax, bin_dir_name
+    mov ax, ple_dir_name
     call fs_change_directory
     jc .restore_and_fail_a_ple
 
     mov ax, command
-    call ple_execute
-    jnc .restore_and_done_ple
+    call fs_file_exists
+    jc .restore_and_fail_a_ple
+
+    ; Load while in A:/PLE.DIR, then restore working dir before running
+    mov ax, command
+    call ple_load
+    jc .restore_and_fail_a_ple
+    call restore_current_dir
+    mov bl, 0x01                  ; show splash
+    call ple_run_loaded
+    jmp get_cmd
 
 .restore_and_fail_a_ple:
     call restore_current_dir
     jmp total_fail
-
-.restore_and_done_ple:
-    call restore_current_dir
-    jmp get_cmd
 
 .success_disk_change_msg db 'Disk changed', 0
 
@@ -1000,6 +1024,9 @@ launch_bin_program:
     mov ss, [bin_ss_save]
     mov sp, [bin_stack_save]
     sti
+
+    mov byte [sched_cur_task], 0
+    mov byte [sched_tasks + TASK_STATE], TASK_S_RUNNING
 
     call fs_reset_floppy
     call EnableMouse
@@ -2150,6 +2177,55 @@ rip_terry:
 
 .rip_terry db "Rest in peace Terry A. Devis (1969 - 2018)", 0
 
+bg_command:
+    call print_newline
+
+    mov word si, [param_list]
+    call string_string_parse
+    test ax, ax
+    jne .have_arg
+
+    mov si, nofilename_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.have_arg:
+    mov [.fname_ptr], ax
+    call fs_file_exists
+    jc .not_found
+
+    mov ax, [.fname_ptr]
+    call ple_execute_bg
+    jc .launch_failed
+
+    push ax
+    mov si, .bg_started_msg
+    call print_string
+    pop ax
+    add al, '0'
+    mov ah, 0x0E
+    xor bh, bh
+    int 0x10
+    call print_newline
+    jmp get_cmd
+
+.not_found:
+    mov si, notfound_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.launch_failed:
+    mov si, .launch_fail_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.fname_ptr        dw 0
+.bg_started_msg   db 'Background task started: id = ', 0
+.launch_fail_msg  db 'Failed to launch background task', 0
+
 %INCLUDE "src/kernel/init.asm"                      ; x16-PRos initialisation
 %INCLUDE "src/kernel/log.asm"                       ; Log functions
 %INCLUDE "src/kernel/features/fs.asm"               ; FAT12 filesystem functions
@@ -2159,6 +2235,8 @@ rip_terry:
 %INCLUDE "src/kernel/features/bmp_rendering.asm"    ; BMP rendering functions
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes
 %INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
+%INCLUDE "src/kernel/features/memory.asm"           ; Kernel heap allocator
+%INCLUDE "src/kernel/features/sched.asm"            ; Cooperative scheduler
 %INCLUDE "src/kernel/features/com/com.asm"          ; COM
 %INCLUDE "src/kernel/features/exe/exe.asm"          ; MZ EXE
 %INCLUDE "src/kernel/features/ple/ple.asm"          ; PLE
@@ -2171,12 +2249,13 @@ rip_terry:
 ; ====== API ======
 %INCLUDE "src/kernel/features/api/api_output.asm"
 %INCLUDE "src/kernel/features/api/api_fs.asm"
+%INCLUDE "src/kernel/features/api/api_sys.asm"
 ; =================
 
 ; ===================== Data Section =====================
 section .data
 ; ------ Header ------
-header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.9', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
+header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v1.0', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
 kshell_comands db 'HELP               - get list of commands', 10, 13
@@ -2199,6 +2278,7 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'CD     <dir>       - change directory', 10, 13
                db 'MKDIR  <dir>       - create directory', 10, 13
                db 'DELDIR <dir>       - delete directory', 10, 13
+               db 'BG     <f>         - run *.PLE program in the background'
                db 'EXIT               - exit to bootloader', 10, 13, 0
 
 ; ------ About OS ------
@@ -2211,7 +2291,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       0.9', 10, 13
+     db '  OS version:       1.0-dev', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0
@@ -2239,6 +2319,7 @@ mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
 terry_string   db 'TERRY', 0
+bg_string      db 'BG', 0
 
 autocomplete_cmd_table:
     dw exit_string, help_string, info_string, cls_string
@@ -2247,6 +2328,7 @@ autocomplete_cmd_table:
     dw size_string, shut_string, reboot_string
     dw touch_string, write_string, view_string, mkdir_string
     dw deldir_string
+    dw bg_string
     dw 0
 
 ; ------ Errors ------
@@ -2444,6 +2526,7 @@ cfg_logo_stretch     db 0  ; 1 = Stretch, 0 = Centered
 
 bin_dir_name         db 'BIN.DIR', 0
 conf_dir_name        db 'CONF.DIR', 0
+ple_dir_name         db 'PLE.DIR', 0
 
 current_drive_char   db 'A'
 
@@ -2487,4 +2570,4 @@ temp_saved_cluster resw 1
 first_boot_buf     resb 8
 
 kernel_end:
-; kernel_end MUST stay below DIRLIST_OFF (0xA800)
+; kernel_end MUST stay below 0xA800

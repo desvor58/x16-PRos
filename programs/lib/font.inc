@@ -26,8 +26,10 @@ FONT_MAP_MASK   equ 0x02
 
 ; ========================================================================
 ; font_init -- Initialize the font rendering system
-; Retrieves the BIOS 8x16 ROM font pointer and sets up VGA
-; registers for direct planar writes.
+; Uses the active system font (hooked at INT 43h by the kernel) so the
+; TUI matches the rest of the OS. Falls back to the BIOS 8x16 ROM font
+; when no custom font is installed. Sets up VGA registers for direct
+; planar writes.
 ; IN:  Nothing
 ; OUT: Nothing (registers preserved)
 ; ========================================================================
@@ -35,10 +37,23 @@ font_init:
     pusha
     push es
 
+    ; Read the INT 43h vector - the kernel points it at the loaded font.
+    xor ax, ax
+    mov es, ax
+    mov bp, [es:0x43*4]             ; font offset
+    mov ax, [es:0x43*4+2]           ; font segment
+
+    ; If the vector is null, fall back to the BIOS ROM font.
+    mov cx, ax
+    or  cx, bp
+    jnz .font_ready
     mov ax, 0x1130
     mov bh, 0x06
-    int 0x10
-    mov word [font_data_seg], es
+    int 0x10                        ; ES:BP -> BIOS ROM 8x16 font (BP = offset)
+    mov ax, es
+
+.font_ready:
+    mov word [font_data_seg], ax
     mov word [font_data_off], bp
 
     mov dx, FONT_GFX_IDX

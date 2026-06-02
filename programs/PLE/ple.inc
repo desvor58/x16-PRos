@@ -5,6 +5,7 @@
 ;   %include "ple.inc"
 ;
 ;   PLE_HEADER entry, "My program", "Author"
+;   PLE_HEADER entry, "My program", "Author", PLE_FLAG_NO_SPLASH
 ;   PLE_LOGO   "logo.raw"             ; 4096 bytes (64x64, 1bpp-byte)
 ;
 ;   PLE_CODE                          ; opens relative segment 0 (code+data)
@@ -17,15 +18,24 @@
 ;   hello db 'Hello from PLE!', 13, 10, '$'
 ;
 ;   PLE_END
+;
+; Header flags (4th PLE_HEADER argument, default 0 = splash + wait for key):
+;   PLE_FLAG_NO_SPLASH (0x01) - skip the splash screen entirely
+;   PLE_FLAG_NO_WAIT   (0x02) - show splash but do not wait for a key
+; Background launches (BG / INT 0x23 AH=0x11) always skip the splash
+; regardless of these flags.
 ; ========================================================================
 
 [BITS 16]
 
-; ----- PLE_HEADER entry_label, "description", "author" -----
-%macro PLE_HEADER 3
+PLE_FLAG_NO_SPLASH equ 0x01
+PLE_FLAG_NO_WAIT   equ 0x02
+
+; ----- PLE_HEADER entry_label, "description", "author" [, flags] -----
+%macro PLE_HEADER 3-4 0
 SECTION .plehdr progbits start=0
 __ple_hdr_start:
-    db 'P','L','E',0                  ; +0x00 magic
+    db 'P','L','E',%4                 ; +0x00 magic 'PLE' + flags byte
     dw 1                              ; +0x04 version
     dw 0                              ; +0x06 entry segment (relative 0)
     dw %1                             ; +0x08 entry IP

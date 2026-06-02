@@ -5,7 +5,8 @@
 
 ; ==================================================================
 ; Some of the string_* functions below are taken from MikeOS
-; Copyright (C) 2006-2014 MikeOS Developers
+;
+; Copyright (C) 2006-2014 MikeOS Developers (https://github.com/mig-hub/mikeOS/blob/master/doc/LICENSE.TXT)
 ; ==================================================================
 
 ; =======================================================================
@@ -343,6 +344,8 @@ string_input_string:
     int 0x16
     jnz .key_ready
     call .cur_tick
+    mov ah, 0x13
+    int 0x23
     jmp .wait_key
 .key_ready:
     call .cur_erase

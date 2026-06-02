@@ -7,6 +7,7 @@ APIs are organized into three categories, each accessible via a specific interru
 
 - **INT 0x21**: Output API for screen output and video mode initialization.
 - **INT 0x22**: File System API for managing files on a FAT12 file system.
+- **INT 0x23**: System API for memory allocation, PLE launch, cooperative multitasking, and mouse control.
 
 Each interrupt handler uses the `AH` register to specify the function code, with other registers used for input and
 output parameters as described below. Unless specified, all functions preserve registers not used for output and set the
@@ -388,25 +389,264 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 
 ---
 
-## Usage Notes
+## INT 0x23 - System API
 
-- **Environment**: The x16-PRos API is designed for a 16-bit real-mode x86 environment, running on a 1.44 MB floppy disk
-  with a FAT12 file system and VGA video mode (640x480, 16 colors).
-- **Filename Format**: File system functions expect filenames in 8.3 format (e.g., `FILENAME.EXT`). Filenames are
-  case-insensitive and converted to uppercase internally.
-- **Error Handling**: Most functions set the carry flag (CF) to indicate errors. Check the CF after calling file system
-  functions to handle errors appropriately.
-- **Register Preservation**: Functions preserve registers unless explicitly used for output, using `pusha`/`popa` or
-  temporary storage.
-- **Interrupts**: Ensure interrupts are enabled (`sti`) before calling API functions, as they rely on BIOS interrupts (
-  `0x10`, `0x13`, `0x1A`, etc.).
-- **Memory Management**: Buffers for file operations (e.g., `fs_get_file_list`, `fs_load_file`) must be large enough to
-  hold the data. The kernel uses fixed buffers like `dirlist` (1024 bytes) and `file_buffer` (32768 bytes).
-- **Limitations**:
-    - File sizes are limited to 16-bit values (65,535 bytes) in some functions.
-    - The root directory is limited to 224 entries (FAT12 limitation).
-    - String functions assume null-terminated strings and may have buffer size limits (e.g., 255 characters for keyboard
-      input).
+INT 0x23 is where the "operating system" part of x16-PRos lives: a heap allocator,
+the hooks for launching PLE programs and steering the cooperative scheduler, and a
+handful of mouse calls.
+
+The functions fall into three groups: memory (`0x00`–`0x03`), tasks and PLE
+(`0x10`–`0x19`), and mouse (`0x20`–`0x25`).
+
+### Function 0x00: Get Version
+
+A version probe. Returns the current API version word so a program can check what
+it's running against before reaching for a newer function. Right now there's only
+one version, `0x0001`.
+
+- **Input**:
+    - `AH` = 0x00
+- **Output**:
+    - `AX` = Version word (currently `0x0001`)
+
+### Function 0x01: Allocate Memory
+
+Grabs a contiguous block from the kernel heap and hands back its segment. The
+segment is paragraph-aligned, so offset 0 inside it is the first byte of your
+block. The request is in bytes but gets rounded up to the next 16-byte paragraph;
+a single block can't be larger than ~64 KiB because of the segment limit, so big
+working sets need several allocations.
+
+- **Input**:
+    - `AH` = 0x01
+    - `BX` = Size in bytes (1..65520)
+- **Output**:
+    - `AX` = Segment of the block, or 0 on failure
+    - `CF` = 1 if the request couldn't be satisfied — out of memory, the descriptor
+      table is full, or `BX` is outside the supported range
+
+### Function 0x02: Free Memory
+
+Returns a block from `0x01` to the heap. Neighbouring free blocks are coalesced, so
+fragmentation doesn't pile up over an alloc/free cycle. Once freed, any pointer into
+the block is dead; the memory itself is left as-is (not zeroed). A double-free is
+caught and reported instead of corrupting the table.
+
+- **Input**:
+    - `AH` = 0x02
+    - `AX` = Segment returned by an earlier `0x01`
+- **Output**:
+    - `CF` = 1 if the segment doesn't match a currently allocated block
+
+### Function 0x03: Get Free Bytes
+
+Reports how much room is left in the heap, as a 32-bit byte count summed over every
+free block. Keep in mind this is the total, not the largest contiguous run - the
+biggest allocation you can actually make may be smaller once the heap is fragmented.
+
+- **Input**:
+    - `AH` = 0x03
+- **Output**:
+    - `DX:AX` = Free bytes (`DX` high word, `AX` low word)
+
+### Function 0x10: Execute PLE Program
+
+Loads and runs a PLE (PRos Large Executable) by name. The kernel carves a fresh load
+arena out of the heap, parses the header and segment table, shows the usual splash
+screen, switches to the program's stack, and jumps to its entry point. When the PLE
+exits, control comes back here and the arena is freed for you. The filename is copied
+into a kernel scratch buffer first, so you can pass it from any data segment. The
+mouse driver is held disabled while the program runs and re-enabled on the way out.
+This is the supported way for one program to launch another — the foundation the
+cooperative multitasking is built on.
+
+- **Input**:
+    - `AH` = 0x10
+    - `DS:SI` = Pointer to a null-terminated 8.3 filename (e.g. `PAINT.PLE`)
+- **Output**:
+    - `CF` = 1 on a load failure — file not found, bad signature, unsupported
+      version, malformed load table, or a segment that isn't paragraph-aligned.
+      The kernel prints a red diagnostic in those cases.
+
+### Function 0x11: Execute PLE Program in Background
+
+Same loader as `0x10`, but instead of running the program inline it registers it as a
+background task in the scheduler and returns straight away. The new task runs
+alongside the caller, and its memory is freed automatically when it exits (via `0x12`
+or by `retf`). The splash screen is skipped here. Background tasks are expected to yield
+often (`0x13`, `0x14`, `0x16`); a task that never yields will starve everything else.
+
+- **Input**:
+    - `AH` = 0x11
+    - `DS:SI` = Pointer to a null-terminated 8.3 filename
+- **Output**:
+    - `AX` = Id of the new task (1..3) on success
+    - `CF` = 1 if the program couldn't be loaded, the header is invalid, or no
+      background slot is free (red diagnostic on load failure)
+
+### Function 0x12: Terminate Current Task
+
+Ends the calling task: frees its memory, returns its slot, and switches to the next
+ready task (falling back to the kernel slot if nothing else is ready). It does not
+return. You can also just `retf` off the end of the program to the legacy landing
+pad, but calling this explicitly is the cleaner option for new PLE programs.
+
+- **Input**:
+    - `AH` = 0x12
+- **Output**: Does not return.
+
+### Function 0x13: Cooperative Yield
+
+Hands the CPU to the next ready task. Your full context - registers, stack pointer,
+flags - is saved and restored intact when you're scheduled again.
+
+- **Input**:
+    - `AH` = 0x13
+- **Output**: None (everything preserved across the yield)
+
+### Function 0x14: Sleep N Ticks
+
+Puts the current task to sleep until at least `CX` BIOS ticks have gone by - one tick
+is about 55 ms at the usual 18.2 Hz PIT rate. Control passes to the next ready task
+right away, and the sleeper is made ready again the first time the scheduler runs
+after its wake tick. Wake times are computed from the 32-bit tick counter at
+`0040:006C`, so midnight wraparound is handled. Called from the kernel slot it
+quietly becomes a plain yield, so the kernel never blocks on its own timer.
+
+- **Input**:
+    - `AH` = 0x14
+    - `CX` = Ticks to wait (0 acts like a yield)
+- **Output**: None (everything preserved)
+
+### Function 0x15: Get Current Task ID
+
+Tells you which scheduler slot you're running in.
+
+- **Input**:
+    - `AH` = 0x15
+- **Output**:
+    - `AL` = Task id (0 = kernel context, 1..3 = user tasks)
+    - `AH` = 0
+
+### Function 0x16: Blocking Key Read with Yield
+
+Waits for a keystroke, but yields to the other tasks while the keyboard buffer is
+empty instead of spinning. Once a key shows up it's consumed and returned exactly as
+`INT 16h`/`AH=0` would. Foreground programs should reach for this rather than a raw
+`INT 16h` so background tasks keep ticking while you sit on an input prompt.
+
+- **Input**:
+    - `AH` = 0x16
+- **Output**:
+    - `AX` = Scan code (high) / ASCII (low), as from `INT 16h`/`AH=0`
+
+### Function 0x17: Query Task Slot
+
+Looks up the state, flags, and arena segment of a given slot - handy for a task
+manager or a `ps`-style listing.
+
+- **Input**:
+    - `AH` = 0x17
+    - `BL` = Task id (0..3)
+- **Output**:
+    - `AL` = State: 0 = free, 1 = ready, 2 = running, 3 = sleeping
+    - `AH` = Flags: bit 0 = background, bit 7 = kernel slot
+    - `CX` = Base segment of the task's arena (kernel `CS` for slot 0, 0 for a free slot)
+    - `CF` = 1 if `BL` is out of range
+
+### Function 0x18: Kill Task by Id
+
+Terminates another task by id, freeing its arena and releasing the slot. To end
+*yourself*, use `0x12` or `retf` instead - this call deliberately refuses to kill the kernel
+slot, the caller, or a slot that's already free.
+
+- **Input**:
+    - `AH` = 0x18
+    - `BL` = Task id (0..3)
+- **Output**:
+    - `CF` = 0 on success
+    - `CF` = 1 on failure (kernel slot, self, or a free slot)
+
+### Function 0x19: Get Task Name
+
+Copies a task's executable filename —-the one it was launched with - into a buffer
+you supply. The name is written into your own data segment, NUL-terminated, and
+truncated to 15 characters plus the terminator, so the buffer needs to be at least
+16 bytes. Slot 0 reports back as `KERNEL`.
+
+- **Input**:
+    - `AH` = 0x19
+    - `BL` = Task id (0..3)
+    - `DI` = Offset of the destination buffer in your `DS` (≥ 16 bytes)
+- **Output**:
+    - Buffer at `DS:DI` filled with the NUL-terminated name
+    - `CF` = 1 if `BL` is out of range
+
+### Function 0x20: Mouse Get State
+
+Reads the mouse in one shot: pixel position, which buttons are down, and whether the
+cursor is currently drawn. Coordinates stay clamped to the visible area of VGA mode
+0x12 (640x480, 16 colors).
+
+- **Input**:
+    - `AH` = 0x20
+- **Output**:
+    - `AX` = X (0..631)
+    - `BX` = Y (0..468)
+    - `CL` = Button mask (bit 0 = LMB, bit 1 = RMB, bit 2 = MMB)
+    - `CH` = Cursor visibility (0 = hidden, 1 = visible)
+
+### Function 0x21: Mouse Get Text Cell
+
+The same position as `0x20`, but snapped to the 8x16 text grid (80 columns by 30
+rows). This is the convenient form for hit-testing a text-mode UI.
+
+- **Input**:
+    - `AH` = 0x21
+- **Output**:
+    - `AX` = Column (0..79)
+    - `BX` = Row (0..29)
+
+### Function 0x22: Mouse Hide Cursor
+
+Hides the cursor sprite and restores the pixels it was covering. Mouse motion stops
+drawing the cursor until you call `0x23`. Calling it when the cursor is already hidden
+does nothing.
+
+- **Input**:
+    - `AH` = 0x22
+- **Output**: None
+
+### Function 0x23: Mouse Show Cursor
+
+Brings the cursor back at its current position. A no-op if it's already showing.
+
+- **Input**:
+    - `AH` = 0x23
+- **Output**: None
+
+### Function 0x24: Mouse Enable / Disable
+
+Turns the whole PS/2 mouse callback on or off. While it's disabled, no motion or
+button events are delivered at all. A program that wants to talk to the mouse with its
+own protocol usually disables the kernel handler on entry and switches it back on
+when it exits.
+
+- **Input**:
+    - `AH` = 0x24
+    - `AL` = 1 to enable, 0 to disable
+- **Output**: None
+
+### Function 0x25: Mouse Drag-Select Enable / Disable
+
+Toggles the kernel's built-in drag-select rectangle — the XOR-inverted box it draws
+while the left button is held. Graphical programs that want to interpret drags
+themselves can switch this off so the selection overlay stays out of their way.
+
+- **Input**:
+    - `AH` = 0x25
+    - `AL` = 1 to enable, 0 to disable
+- **Output**: None
 
 ---
 

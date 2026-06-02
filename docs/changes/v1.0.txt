@@ -1,0 +1,103 @@
+----------------------- Key changes x16-PRos v1.0 ----------------------
+
+This is one of the biggest updates in this episode. A lot of bugs 
+have been fixed, a lot of lines of code have been written and now,
+finally, I can present to you a stable release of x16-PRos,
+which is ready to replace MS-DOS
+                                        -- PRoX
+
+=======================================================================================
+
+1. Cooperative multitasking
+1) Task scheduler (src/kernel/features/sched.asm)
+   - Four task slots
+   - Task states: free / ready / running / sleeping
+   - Background and foreground tasks live side by side
+   - Each task keeps its own SS:SP, base segment and wake-up tick
+2) Tasks yield control on their own (cooperative, not preemptive)
+   - A task gives up the CPU with INT 0x23 AH=0x13, or whenever it
+     waits for a key or goes to sleep
+3) Sleeping tasks wake up on the BIOS tick counter (~55 ms per tick)
+
+=======================================================================================
+
+2. Kernel memory allocator
+1) New first-fit allocator (src/kernel/features/memory.asm)
+   - Manages the heap from segment 0x3000 up to 0xA000
+   - Up to 32 live allocations tracked at once
+   - Adjacent free blocks are merged back together on free
+2) Programs ask for memory in bytes and get a segment back, no more
+   guessing where it is safe to scribble
+
+=======================================================================================
+
+3. New system API - INT 0x23
+1) Brand new interrupt for everything the new subsystems expose
+   (src/kernel/features/api/api_sys.asm)
+2) Memory calls
+   - 0x00 Get version
+   - 0x01 Allocate memory (BX = bytes, returns segment in AX)
+   - 0x02 Free memory
+   - 0x03 Get free bytes
+3) Program / task calls
+   - 0x10 Run a PLE program in the foreground
+   - 0x11 Run a PLE program in the background (returns a task id)
+   - 0x12 Terminate the current task
+   - 0x13 Yield to the next ready task
+   - 0x14 Sleep for CX ticks
+   - 0x15 Get current task id
+   - 0x16 Read a key but yield while waiting
+   - 0x17 Query a task slot (state, flags, base segment)
+   - 0x18 Kill a task by id
+   - 0x19 Copy a task's name into your buffer
+4) Mouse calls (0x20 - 0x25)
+   - Get state, get text cell, hide / show cursor,
+     enable / disable, drag-select on / off
+
+=======================================================================================
+
+4. New programs
+1) PS.BIN - lists the active tasks
+2) KILL.BIN - terminates task by its id
+3) CLOCK.PLE - background clock
+
+=======================================================================================
+
+5. PLE header flags
+1) PLE_HEADER now takes an optional 4th argument with flags
+   - PLE_FLAG_NO_SPLASH (0x01) - skip the splash screen entirely
+   - PLE_FLAG_NO_WAIT   (0x02) - show the splash but don't wait for a key
+2) The flags byte lives at offset 0x03 of the PLE header, right after
+   the 'PLE' magic
+3) Background launches always skip the splash, no matter the flags
+4) ple.inc and the PLE README updated to document all of this
+
+=======================================================================================
+
+6. BMP renderer improvements
+
+=======================================================================================
+
+7. Paint update
+1) Paint now talks to the mouse through the INT 0x23 calls instead of
+   poking the driver directly
+
+=======================================================================================
+
+8. Tooling
+1) scripts/image2bmp.py
+   - New --stretch flag: force an exact size and ignore aspect ratio
+   - Default canvas changed to 320x240
+
+=======================================================================================
+
+9. Themes and fonts in the TUI
+1) The TUI library now renders with the active system font instead of
+   always falling back to the BIOS ROM font, so dialogs and menus match
+   the rest of the OS
+   - font_init reads the font hooked at INT 43h by the kernel and only
+     drops back to the 8x16 ROM font when nothing custom is installed
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011

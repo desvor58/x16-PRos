@@ -26,7 +26,8 @@ fs_load_huge_file, so it can span more than 64 KiB.
   +--------+------+------------------------------------+
   | offset | size | field                              |
   +--------+------+------------------------------------+
-  | 0x00   |   4  | magic 'P','L','E',0                |
+  | 0x00   |   3  | magic 'P','L','E'                   |
+  | 0x03   |   1  | header flags (see below)           |
   | 0x04   |   2  | version                            |
   | 0x06   |   2  | entry rel-seg id                   |
   | 0x08   |   2  | entry IP                           |
@@ -36,6 +37,14 @@ fs_load_huge_file, so it can span more than 64 KiB.
   | 0x10   |  32  | description                        |
   | 0x30   |  16  | author                             |
   +--------+------+------------------------------------+
+
+  Header flags (byte at offset 0x03):
+    bit 0  PLE_FLAG_NO_SPLASH  skip the splash before launch
+    bit 1  PLE_FLAG_NO_WAIT    show splash but do not wait for a key
+    bits 2..7 reserved, must be 0
+
+  If the flags byte is 0 (3-arg PLE_HEADER), behavior is the legacy
+  one: splash is drawn and the loader waits for a keypress.
 
 ============================================================
  Load-table entry (8 bytes)

@@ -10,6 +10,7 @@ init_system:
     call init_segments
     call init_disks
     call init_timer
+    call init_memory
     call init_api
     call init_configs
     call init_display
@@ -56,6 +57,18 @@ init_timer:
 
     ret
 
+init_memory:
+    call mem_init
+
+    mov si, memory_init_msg
+    call log_okay
+
+    call sched_init
+
+    mov si, sched_init_msg
+    call log_okay
+    ret
+
 init_api:
     mov si, api_init_msg
     call log_okay
@@ -68,6 +81,11 @@ init_api:
     call api_fs_init
 
     mov si, api_fs_init_msg
+    call log_okay
+
+    call api_sys_init
+
+    mov si, api_sys_init_msg
     call log_okay
     ret
 
@@ -981,9 +999,12 @@ load_password_cfg:
 segment_init_msg         db 'Segment initialization', 0
 disk_init_msg            db 'Disks initialisation', 0
 timer_init_msg           db 'Timer initialization', 0
+memory_init_msg          db 'Memory allocator', 0
+sched_init_msg           db 'Task scheduler', 0
 api_init_msg             db 'API initialization', 0
 api_output_init_msg      db 'Output API (INT 0x21)', 0
 api_fs_init_msg          db 'File System API (INT 0x22)', 0
+api_sys_init_msg         db 'System API (INT 0x23)', 0
 config_init_msg          db 'Configuration loading', 0
 display_init_msg         db 'Display initialization', 0
 mouse_init_msg           db 'Mouse driver loaded', 0

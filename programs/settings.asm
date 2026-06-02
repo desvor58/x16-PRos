@@ -5,6 +5,9 @@
 ; Made by PRoX-dev
 ; ==================================================================
 
+; KNOWN ISUE: when exiting the program, the system clears the screen,
+;             displays a prompt, but then freezes
+
 [BITS 16]
 [ORG 0x8000]
 
@@ -136,7 +139,7 @@ start:
     jmp .main_loop
 
 .exit:
-    mov ax, 0x0012
+    mov ax, 0x12
     int 0x10
     ret
 

@@ -344,6 +344,8 @@ done
 programs=(
     "programs/help.asm HELP.BIN"
     "programs/grep.asm GREP.BIN"
+    "programs/ps.asm PS.BIN"
+    "programs/kill.asm KILL.BIN"
     "programs/head.asm HEAD.BIN"
     "programs/tail.asm TAIL.BIN"
     "programs/cpu.asm CPU.BIN"
@@ -447,6 +449,7 @@ done
 
 programs_ple=(
     "programs/PLE/src/hello.asm HELLO.PLE"
+    "programs/PLE/src/clock.asm CLOCK.PLE"
 )
 
 for prog in "${programs_ple[@]}"; do

@@ -5,7 +5,7 @@
 <h1>x16-PRos Operating System</h1>
 
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE.TXT)
-[![Version](https://img.shields.io/badge/version-0.9-blue?style=for-the-badge)](docs/changes/v0.9.txt)
+[![Version](https://img.shields.io/badge/version-1.0-blue?style=for-the-badge)](docs/changes/v1.0.txt)
 [![Assembler](https://img.shields.io/badge/assembler-NASM-1f425f?style=for-the-badge)](https://nasm.us/)
 [![Boot Mode](https://img.shields.io/badge/boot-BIOS%20Legacy-orange?style=for-the-badge)](#running-x16-pros)
 
@@ -27,9 +27,9 @@
 
 ## Overview
 
-**x16-PRos** is a lightweight real-mode operating system designed for the x86 architecture and written entirely in NASM assembly. It features a command-line interface, supports the FAT12 file system, and includes a large standard software suite. This OS demonstrates fundamental operating system design principles, including booting, file system management, interrupt handling, and hardware interaction.
+**x16-PRos** is a lightweight real-mode multitasking operating system designed for the x86 architecture and written entirely in NASM assembly. It features a command-line interface, supports the FAT12 file system, and includes a large standard software suite. This OS demonstrates fundamental operating system design principles and can be used for learning OSdev.
 
-Designed for simplicity and educational value, x16-PRos provides a platform for low-level programming enthusiasts to explore bare-metal development on x86 systems.
+Also it`s a platform for low-level programming enthusiasts to explore development for x86 operating systems.
 
 > [!IMPORTANT]
 > The project needs contributors. Now only I, PRoX2011, is working on the kernel, but I can’t do everything alone. I would like to ask you how to help the project.
@@ -63,7 +63,8 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 
 ## Key Features
 
-- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables.
+- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables
+- **Multitasking**: Cooperative multitasking support for `.PLE` programs
 - **Encrypted Password System**: XOR-based password encryption with custom key
 - **User Authentication**: Login system with configurable user account
 - **Password Protection**: Encrypted PASSWORD.CFG prevents plaintext password storage
@@ -84,7 +85,7 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 - **Multiple disk support**: detect/list available drives and switch drives in the terminal
 - **cp866 fonts support**: change system font using config or TUI application
 - **Timezones support**: change your time zone via TIMEZONE.CFG
-- **AND MUCH MORE FEATURES**
+- **AND MUCH MORE**
 
 ---
 
@@ -94,7 +95,7 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 The system includes a powerful terminal - **PRos Terminal**. It not only allows you to launch programs but also offers a wide range of built-in commands and utilities.
 
 > [!NOTE]
-> To run a program, enter the name of the executable file (.BIN or .COM) with or without an extension. Programs will be launched from any directory if its file is placed in the BIN/ directory, and if the program file is not found there, the system will try to find the program in the current, working directory
+> To run a program, enter the name of the executable file (`.BIN`, `.PLE`, `.COM` or `.EXE`) with or without an extension. Programs will be launched from any directory if its `.BIN` file is placed in the `BIN/` (or for `.PLE` programs in `PLE/`) directory, and if the program file is not found there, the system will try to find the program in the current, working directory
 
 <div style="display: flex; flex-direction: row; gap: 20px">
   <img src="docs/screenshots/dir.png" width=45%>
@@ -133,6 +134,7 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 | `ren` | `ren <old> <new>` | Rename file (root directory only) |
 | `touch` | `touch <filename>` | Create empty file |
 | `write` | `write <file> <text>` | Write text to file |
+| `bg` | `bg <file>` | Run `.PLE` program in the background |
 
 #### Directory Operations
 | Command | Syntax | Description |
@@ -271,7 +273,7 @@ x16-PRos includes a comprehensive collection of built-in applications:
   </td>
 <td width="33%" align="center">
     <br>
-    <b>And more...</b><br>
+    <b>And MUCH more...</b><br>
     SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM, CALENDAR.BIN
   </td>
 </tr>

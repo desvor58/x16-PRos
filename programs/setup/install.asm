@@ -55,6 +55,7 @@ install_run:
     pop es
     cld
     call tui_init
+    call tui_reset_palette          ; ignore the active theme, use VGA colors
 
     call install_draw_screen
 
@@ -175,7 +176,7 @@ install_probe_one:
     mov ah, 0x08
     int 0x13
     mov [.bios_ah], ah
-    mov [.bios_cf], 0
+    mov byte [.bios_cf], 0
     jnc .no_cf
     mov byte [.bios_cf], 1
 .no_cf:
