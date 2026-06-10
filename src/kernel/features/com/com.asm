@@ -108,6 +108,16 @@ int20_handler:
     cli
     cld
 
+    cmp byte [cs:com_active], 0
+    jne .com_teardown
+
+    mov ax, 0x12
+    int 0x10
+    jmp launch_bin_program.program_done
+
+.com_teardown:
+    mov byte [cs:com_active], 0
+
     push ds
     push es
     push si

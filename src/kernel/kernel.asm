@@ -1041,6 +1041,7 @@ execute_com:
     ; Save current stack
     mov [com_stack_save], sp
     mov [com_ss_save], ss
+    mov byte [com_active], 1
 
     call api_dos_init
 
@@ -1378,6 +1379,7 @@ list_directory:
 cat_file:
     call print_newline
     pusha
+    push es
 
     mov word si, [param_list]
     call string_string_parse
@@ -1487,6 +1489,7 @@ cat_file:
     call print_newline
 
 .exit_cat:
+    pop es
     popa
     call print_newline
     jmp get_cmd
@@ -2499,6 +2502,7 @@ timezone_offset      dw 0
 
 com_stack_save       dw 0
 com_ss_save          dw 0
+com_active           db 0
 bin_stack_save       dw 0
 bin_ss_save          dw 0
 program_seg_runtime  dw program_seg

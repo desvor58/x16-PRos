@@ -100,4 +100,13 @@ which is ready to replace MS-DOS
 
 =======================================================================================
 
+10. Bug fixes
+1) CAT no longer breaks the shell
+   - The file print loop retargeted ES to walk the loaded file and never
+     restored it, so after CAT every typed command landed in the wrong
+     segment and the shell silently did nothing
+2) INT 0x20 exit from BIN programs no longer hangs the system
+
+=======================================================================================
+
 Copyright (C) 2024-2026 PRoX2011
