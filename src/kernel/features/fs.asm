@@ -3402,83 +3402,130 @@ fs_get_next_directory_cluster:
 .next_cluster  dw 0
 
 ; ==================================================================
-; FS_INIT_DRIVES - Detects available drives
-; OUT: Fills internal structures
+; FS_INIT_DRIVES - Detects every available drive
+; OUT: Fills drives_table / drive_count
 ; ==================================================================
 fs_init_drives:
     pusha
+    push es
     mov byte [drive_count], 0
     mov di, drives_table
 
+    ; --- Floppy slots 0x00 and 0x01 ---
     mov dl, 0x00
-    call .check_drive
-    jc .check_floppy_b
-    call .add_drive_a
-
-.check_floppy_b:
+    call .probe_present
+    jc .floppy_b
+    mov dl, 0x00
+    mov dh, 1
+    call .add_drive
+.floppy_b:
     mov dl, 0x01
-    call .check_drive
-    jc .check_hdd_c
-    call .add_drive_b
-
-.check_hdd_c:
+    call .probe_present
+    jc .hdd_enum
+    mov dl, 0x01
+    mov dh, 1
+    call .add_drive
+.hdd_enum:
+    push es
+    xor ax, ax
+    mov es, ax
+    xor di, di
+    mov ah, 0x08
     mov dl, 0x80
-    call .check_drive
-    jc .done_init
-    call .add_drive_c
+    int 13h
+    pop es
+    jc .hdd_count_bda
+    movzx cx, dl
+    jmp .hdd_count_ready
+.hdd_count_bda:
+    push ds
+    xor ax, ax
+    mov ds, ax
+    mov al, [0x0475]
+    pop ds
+    movzx cx, al
 
-    mov dl, 0x81
-    call .check_drive
-    jc .done_init
-    call .add_drive_d
+.hdd_count_ready:
+    movzx ax, byte [drive_count]
+    mov bx, 3
+    mul bx
+    mov di, drives_table
+    add di, ax
+
+    test cx, cx
+    jz .done_init
+    cmp cx, MAX_HDD
+    jbe .hdd_loop_init
+    mov cx, MAX_HDD
+.hdd_loop_init:
+    mov dl, 0x80
+.hdd_loop:
+    call .probe_present
+    jc .hdd_skip
+    mov dh, 2
+    call .add_drive
+.hdd_skip:
+    inc dl
+    cmp dl, 0x80 + MAX_HDD
+    jae .done_init
+    dec cx
+    jnz .hdd_loop
 
 .done_init:
     call fs_reset_floppy
+    pop es
     popa
     ret
-
-.check_drive:
+.probe_present:
+    push ax
+    push bx
+    push cx
+    push dx
     push es
     push di
-    
-    mov ah, 08h
-    mov al, 0
+    xor ax, ax
+    mov es, ax
+    xor di, di
+    mov ah, 0x08
     int 13h
-    
+    jc .pp_absent
+    test ah, ah
+    jnz .pp_absent
     pop di
     pop es
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    clc
     ret
-
-.add_drive_a:
-    mov byte [di], 'A'
-    mov byte [di+1], 0x00
-    mov byte [di+2], 1 
+.pp_absent:
+    pop di
+    pop es
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    stc
+    ret
+.add_drive:
+    cmp byte [drive_count], MAX_DRIVES
+    jae .ad_full
+    mov al, dl
+    cmp al, 0x80
+    jae .ad_hdd
+    add al, 'A'                   ; 0x00 -> A, 0x01 -> B
+    jmp .ad_store
+.ad_hdd:
+    sub al, 0x80
+    add al, 'C'                   ; 0x80 -> C, 0x81 -> D, ...
+.ad_store:
+    mov [di], al
+    mov [di+1], dl
+    mov [di+2], dh
     add di, 3
     inc byte [drive_count]
-    ret
-
-.add_drive_b:
-    mov byte [di], 'B'
-    mov byte [di+1], 0x01
-    mov byte [di+2], 1
-    add di, 3
-    inc byte [drive_count]
-    ret
-
-.add_drive_c:
-    mov byte [di], 'C'
-    mov byte [di+1], 0x80
-    mov byte [di+2], 2
-    add di, 3
-    inc byte [drive_count]
-    ret
-
-.add_drive_d:
-    mov byte [di], 'D'
-    mov byte [di+1], 0x81
-    mov byte [di+2], 2
-    add di, 3
-    inc byte [drive_count]
+.ad_full:
     ret
 
 ; ========================================================================
@@ -3894,5 +3941,12 @@ fs_update_geometry:
     popa
     ret
 
+; Drive enumeration limits.
+;   MAX_HDD     - hard disks probed (0x80 .. 0x80+MAX_HDD-1 => letters C..)
+;   MAX_DRIVES  - total table capacity (2 floppies + hard disks)
+; Each drives_table entry is 3 bytes: letter, BIOS drive number, type.
+MAX_HDD      equ 14
+MAX_DRIVES   equ 16
+
 drive_count db 0
-drives_table times 30 db 0
+drives_table times (MAX_DRIVES * 3) db 0
