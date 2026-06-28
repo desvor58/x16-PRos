@@ -162,6 +162,8 @@ int20_handler:
     call api_output_init
     call string_clear_screen
 
+    call EnableMouse
+
     jmp get_cmd
 
 .finished_msg db 'Program finished. Press any key to continue...', 10, 13, 0

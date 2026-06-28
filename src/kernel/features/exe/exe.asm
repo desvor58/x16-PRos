@@ -104,6 +104,7 @@ exe_execute:
 
     mov [com_stack_save], sp
     mov [com_ss_save], ss
+    mov byte [com_active], 1
 
     call api_dos_init
     call DisableMouse

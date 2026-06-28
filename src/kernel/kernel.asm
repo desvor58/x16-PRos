@@ -453,6 +453,8 @@ get_cmd:
     mov ax, command
     call string_string_uppercase
 
+    mov byte [ple_fallthrough], 0
+
     ; ============ Drive Change Check (A:, B:, C:) ============
     mov si, command
     
@@ -673,11 +675,10 @@ get_cmd:
     mov byte [si+3], 'E'
     mov byte [si+4], 0
 
-    ; Check if .PLE file exists
-    mov ax, command
-    call fs_file_exists
-    jnc .load_ple_program
+    mov byte [ple_fallthrough], 1
+    jmp .load_ple_program
 
+.try_bin_extension:
     ; .PLE not found, try .BIN
     mov ax, command
     call string_string_length
@@ -886,7 +887,7 @@ get_cmd:
 .restore_and_try_a_ple:
     call restore_current_dir
     cmp byte [current_drive_char], 'A'
-    je total_fail
+    je .ple_not_found
 
     ; Try A:/PLE.DIR
     call save_current_dir
@@ -913,7 +914,10 @@ get_cmd:
 
 .restore_and_fail_a_ple:
     call restore_current_dir
-    jmp total_fail
+.ple_not_found:
+    cmp byte [ple_fallthrough], 0
+    je total_fail
+    jmp .try_bin_extension
 
 .success_disk_change_msg db 'Disk changed', 0
 
@@ -963,8 +967,10 @@ install_program_thunk:
 ; OUT: DS = ES = KERNEL_DATA_SEG, SS:SP restored, mouse/floppy/font
 ;      and theme reinstalled. Caller resumes with kernel state intact.
 ;
-; Stack layout when exec:
-;   [SP+0] = PROGRAM_THUNK_OFF   ; what program's near ret will pop
+; The program runs with SS = DS = ES = CS = PROGRAM_LOAD_SEG (its own stack
+; at the top of the segment), so SS == DS as C tiny/small model requires.
+; The exit trampoline lives on the program's stack:
+;   [SP+0] = PROGRAM_THUNK_OFF   ; what the program's near ret pops
 ;   [SP+2] = .program_done       ; IP for thunk's retf
 ;   [SP+4] = kernel CS           ; CS for thunk's retf
 ; ==================================================================
@@ -993,25 +999,26 @@ launch_bin_program:
     pop si
     pop ax
 
-    ; ---- Save kernel stack in case BIN messes with SS:SP ----
     mov [bin_stack_save], sp
     mov [bin_ss_save], ss
 
     call DisableMouse
 
-    ; ---- Build trampoline frame on the (still kernel) stack ----
-    push cs                       ; -> [SP+4] for retf
-    push word .program_done       ; -> [SP+2] for retf
-    push word PROGRAM_THUNK_OFF   ; -> [SP+0] for program's near ret
-
-    ; ---- Set up program entry registers ----
     test si, si
     jz .si_zero
     mov si, PROGRAM_PARAMS_OFF
 .si_zero:
 
     mov ax, PROGRAM_LOAD_SEG
-    mov ds, ax
+    cli
+    mov ss, ax
+    mov sp, COM_STACK_TOP         ; 0xFFFE, top of the program segment
+    push cs                       ; [SP+4] kernel CS for the thunk's retf
+    push word .program_done       ; [SP+2] IP for the thunk's retf
+    push word PROGRAM_THUNK_OFF   ; [SP+0] target of the program's near ret
+    sti
+
+    mov ds, ax                    ; SS == DS == ES == CS == PROGRAM_LOAD_SEG
     mov es, ax
 
     jmp PROGRAM_LOAD_SEG:PROGRAM_LOAD_OFF
@@ -2494,6 +2501,7 @@ y_offset             dw 0
 
 bin_extension        db '.BIN', 0
 com_extension        db '.COM', 0
+ple_fallthrough      db 0
 
 total_file_size      dd 0
 file_count           dw 0

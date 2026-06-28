@@ -208,6 +208,12 @@ mmd -i disk_img/x16pros.img ::/PLE.DIR
 check_error "Failed to create PLE directory"
 print_ok "PLE directory created successfully"
 
+# Create PLE/GUI directory (windowed programs the GUI launches)
+print_info "Creating PLE/GUI directory..."
+mmd -i disk_img/x16pros.img ::/PLE.DIR/GUI.DIR
+check_error "Failed to create PLE/GUI directory"
+print_ok "PLE/GUI directory created successfully"
+
 # Create BMP directory
 print_splitline "Creating BMP directory..."
 print_info "Creating BMP directory..."
@@ -447,9 +453,11 @@ for prog in "${programs_exe[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
+# CLI PLE programs
 programs_ple=(
     "programs/PLE/src/hello.asm HELLO.PLE"
     "programs/PLE/src/clock.asm CLOCK.PLE"
+    "programs/PLE/src/gui/gui.asm GUI.PLE"
 )
 
 for prog in "${programs_ple[@]}"; do
@@ -458,7 +466,7 @@ for prog in "${programs_ple[@]}"; do
 
     if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
         print_info "Compiling $src => bin/$bin_name..."
-        nasm -f bin -I programs/PLE/ $src -o bin/$bin_name
+        nasm -f bin -I programs/PLE/ -I programs/lib/ -I programs/PLE/src/gui/ $src -o bin/$bin_name
         check_error "Compilation of $src failed"
         print_ok "$bin_name compiled successfully"
     fi
@@ -469,7 +477,31 @@ for prog in "${programs_ple[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
-mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
+# Windowed PLE programs (GUI.PLE compatible)
+programs_ple_gui=(
+    "programs/PLE/src/windowed/eyes.asm EYES.PLE"
+    "programs/PLE/src/windowed/clock.asm CLOCK.PLE"
+    "programs/PLE/src/windowed/hello.asm HELLO.PLE"
+)
+
+for prog in "${programs_ple_gui[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin -I programs/PLE/ -I programs/lib/ $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
+
+    print_info "Copying $bin_name to PLE.DIR/GUI.DIR..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/PLE.DIR/GUI.DIR/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
+# mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
 
 # Copy text files
 if [ $FLAG_NO_TXT == 0 ]; then

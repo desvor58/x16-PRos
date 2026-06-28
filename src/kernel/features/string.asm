@@ -364,6 +364,8 @@ string_input_string:
     je .handle_history_scroll_up
     cmp ah, 0x50
     je .handle_history_scroll_down
+    cmp ah, 0x3C
+    je .launch_gui
     cmp cx, 255
     jge .read_loop
     stosb
@@ -566,6 +568,19 @@ string_input_string:
     mov bl, 0x1F
     call print_char
     jmp .read_loop
+    
+.launch_gui:
+    call .ac_clear
+    mov di, [.start_input_buf_addr]
+    mov si, .gui_cmd
+.lg_copy:
+    lodsb
+    test al, al
+    jz .done_read
+    stosb
+    jmp .lg_copy
+
+.gui_cmd db 'GUI.PLE', 0
 
 .done_read:
     call .cur_erase
