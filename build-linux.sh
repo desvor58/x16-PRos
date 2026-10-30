@@ -13,6 +13,9 @@ FLAG_NO_KERNEL_RECOMP=0
 FLAG_NO_PROGRAMS_RECOMP=0
 FLAG_NO_LOGO_DISPLAY=0
 FLAG_NO_SETUP=0
+FLAG_NO_LOG=0
+FLAG_NO_LIST_DRIVERS=0
+FLAG_NO_AUTOEXEC=0
 FLAG_DTM=0  # DTM - Dev Tesing Mode
 
 MAX_KERNEL_LOADER_BYTES=57344   # 0xE000 - kernel image must end before disk_buffer
@@ -27,7 +30,10 @@ for arg in $@; do
     if [ $arg == "-no-programs-recomp" ]; then FLAG_NO_PROGRAMS_RECOMP=1; continue; fi
     if [ $arg == "-no-logo-display" ]; then FLAG_NO_LOGO_DISPLAY=1; continue; fi
     if [ $arg == "-no-setup" ]; then FLAG_NO_SETUP=1; continue; fi
-    if [ $arg == "-dtm" ]; then FLAG_NO_SETUP=1; FLAG_NO_LOGO_DISPLAY=1; FLAG_NO_BOOT_RECOMP=1; continue; fi
+    if [ $arg == "-no-log" ]; then FLAG_NO_LOG=1; continue; fi
+    if [ $arg == "-no-list-drivers" ]; then FLAG_NO_LIST_DRIVERS=1; continue; fi
+    if [ $arg == "-no-autoexec" ]; then FLAG_NO_AUTOEXEC=1; continue; fi
+    if [ $arg == "-dtm" ]; then FLAG_DTM=1; FLAG_NO_LOG=1; FLAG_NO_SETUP=1; FLAG_NO_LOGO_DISPLAY=1; FLAG_NO_BOOT_RECOMP=1; continue; fi
 done
 
 RED='\033[31m'
@@ -123,6 +129,15 @@ if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
     addition_flags=""
     if [ $FLAG_NO_LOGO_DISPLAY == 1 ]; then
         addition_flags="-d NO_LOGO_DISPLAY"
+    fi
+    if [ $FLAG_NO_LOG == 1 ]; then
+        addition_flags="$addition_flags -d NO_LOG"
+    fi
+    if [ $FLAG_NO_LIST_DRIVERS == 1 ]; then
+        addition_flags="$addition_flags -d NO_LIST_DRIVES"
+    fi
+    if [ $FLAG_NO_AUTOEXEC == 1 ]; then
+        addition_flags="$addition_flags -d NO_AUTOEXEC"
     fi
     baseline_kernel_size=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
     print_info "Compiling kernel (kernel.asm => bin/KERNEL.BIN)..."
@@ -444,6 +459,7 @@ programs=(
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
     "programs/prasm.asm PRASM.BIN"
+    "programs/bigc.asm BIGC.BIN"
 )
 
 for prog in "${programs[@]}"; do

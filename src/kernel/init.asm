@@ -19,7 +19,9 @@ init_system:
     call init_display
     call init_security
     call init_modules
+%ifndef NO_AUTOEXEC
     call init_autoexec
+%endif
     ret
 
 init_segments:

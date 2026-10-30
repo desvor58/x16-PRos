@@ -3,6 +3,10 @@ log_buf_used    dw 0
 log_file_ready  db 0
 
 log_clear_on_boot:
+%ifdef NO_LOG
+    ret
+%endif
+
     pusha
     mov byte [log_file_ready], 1
     mov word [log_buf_used], 0
@@ -14,6 +18,10 @@ log_clear_on_boot:
     ret
 
 log_okay:
+%ifdef NO_LOG
+    ret
+%endif
+
     push si
     mov si, okay_message
     call print_string_green
@@ -29,6 +37,10 @@ log_okay:
     ret
 
 log_warn:
+%ifdef NO_LOG
+    ret
+%endif
+
     push si
     mov si, warn_message
     call print_string_yellow
@@ -72,6 +84,10 @@ log_delay:
     ret
 
 log_write_to_file:
+%ifdef NO_LOG
+    ret
+%endif
+
     cmp byte [log_file_ready], 0
     jne .ready
     ret

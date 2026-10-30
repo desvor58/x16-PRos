@@ -3776,6 +3776,9 @@ fs_init_drives:
 ; FS_LIST_DRIVES - Prints available drives with filesystem details
 ; ========================================================================
 fs_list_drives:
+%ifdef NO_LIST_DRIVES
+    ret
+%endif
     pusha
 
     mov al, [current_disk]
