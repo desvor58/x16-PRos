@@ -128,6 +128,13 @@ infix_to_postfix:
 .done:
 .ops_pull_loop:
     mov bx, [op_stack_top]
+    pusha
+        mov ax, bx
+        call string_int_to_string
+        mov si, ax
+        mov ah, 0x01
+        int 0x21
+    popa
     test bx, bx
     jz .exit
     mov al, [op_stack + bx]
@@ -154,8 +161,8 @@ try_get_digit:
 
 .exit:
     push ax
-    mov al, ' '
-    stosb
+        mov al, ' '
+        stosb
     pop ax
     ret
 
@@ -269,3 +276,30 @@ op_stack       times 16 db 0
 op_stack_top   dw 0
 
 LPARENT_TOK equ 255
+
+string_int_to_string:
+    pusha
+    mov cx, 0
+    mov bx, 10
+    mov di, .t
+
+.push:
+    mov dx, 0
+    div bx
+    inc cx
+    push dx
+    test ax, ax
+    jnz .push
+.pop:
+    pop dx
+    add dl, '0'
+    mov [di], dl
+    inc di
+    dec cx
+    jnz .pop
+    mov byte [di], 0
+    popa
+    mov ax, .t
+    ret
+
+.t times 7 db 0

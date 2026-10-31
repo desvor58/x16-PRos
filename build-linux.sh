@@ -8,9 +8,9 @@
 FLAG_QUIET_MODE=0
 FLAG_NO_MUSIC=0
 FLAG_NO_TXT=0
-FLAG_NO_BOOT_RECOMP=0
-FLAG_NO_KERNEL_RECOMP=0
-FLAG_NO_PROGRAMS_RECOMP=0
+FLAG_FORCE_BOOT_RECOMP=0
+FLAG_FORCE_KERNEL_RECOMP=0
+FLAG_FORCE_PROGRAMS_RECOMP=0
 FLAG_NO_LOGO_DISPLAY=0
 FLAG_NO_SETUP=0
 FLAG_NO_LOG=0
@@ -22,19 +22,34 @@ MAX_KERNEL_LOADER_BYTES=57344   # 0xE000 - kernel image must end before disk_buf
 KERNEL_SIZE_WARN_BYTES=55296    # 0xD800 - warn 2 KiB before the ceiling
 
 for arg in $@; do
-    if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
-    if [ $arg == "-no-music" ]; then FLAG_NO_MUSIC=1; continue; fi
-    if [ $arg == "-no-txt" ]; then FLAG_NO_TXT=1; continue; fi
-    if [ $arg == "-no-boot-recomp" ]; then FLAG_NO_BOOT_RECOMP=1; continue; fi
-    if [ $arg == "-no-kernel-recomp" ]; then FLAG_NO_KERNEL_RECOMP=1; continue; fi
-    if [ $arg == "-no-programs-recomp" ]; then FLAG_NO_PROGRAMS_RECOMP=1; continue; fi
-    if [ $arg == "-no-logo-display" ]; then FLAG_NO_LOGO_DISPLAY=1; continue; fi
-    if [ $arg == "-no-setup" ]; then FLAG_NO_SETUP=1; continue; fi
-    if [ $arg == "-no-log" ]; then FLAG_NO_LOG=1; continue; fi
-    if [ $arg == "-no-list-drivers" ]; then FLAG_NO_LIST_DRIVERS=1; continue; fi
-    if [ $arg == "-no-autoexec" ]; then FLAG_NO_AUTOEXEC=1; continue; fi
-    if [ $arg == "-dtm" ]; then FLAG_DTM=1; FLAG_NO_LOG=1; FLAG_NO_SETUP=1; FLAG_NO_LOGO_DISPLAY=1; FLAG_NO_BOOT_RECOMP=1; continue; fi
+    if   [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue
+    elif [ $arg == "-no-music" ]; then FLAG_NO_MUSIC=1; continue
+    elif [ $arg == "-no-txt" ]; then FLAG_NO_TXT=1; continue
+    elif [ $arg == "-force-boot-recomp" ]; then FLAG_FORCE_BOOT_RECOMP=1; continue
+    elif [ $arg == "-force-kernel-recomp" ]; then FLAG_FORCE_KERNEL_RECOMP=1; continue
+    elif [ $arg == "-force-programs-recomp" ]; then FLAG_FORCE_PROGRAMS_RECOMP=1; continue
+    elif [ $arg == "-no-logo-display" ]; then FLAG_NO_LOGO_DISPLAY=1; continue
+    elif [ $arg == "-no-setup" ]; then FLAG_NO_SETUP=1; continue
+    elif [ $arg == "-no-log" ]; then FLAG_NO_LOG=1; continue
+    elif [ $arg == "-no-list-drivers" ]; then FLAG_NO_LIST_DRIVERS=1; continue
+    elif [ $arg == "-no-autoexec" ]; then FLAG_NO_AUTOEXEC=1; continue
+    elif [ $arg == "-dtm" ]; then FLAG_DTM=1; FLAG_NO_LOG=1; FLAG_NO_SETUP=1; FLAG_NO_LOGO_DISPLAY=1; continue
+    else print_failed "Unknown argument: $arg"; fi
 done
+
+OLD_FLAG_FORCE_KERNEL_RECOMP=-1
+OLD_FLAG_NO_LOGO_DISPLAY=-1
+OLD_FLAG_NO_LOG=-1
+OLD_FLAG_NO_LIST_DRIVERS=-1
+OLD_FLAG_NO_AUTOEXEC=-1
+
+if [ -f bin/flags.txt ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            FLAG_*) eval "OLD_$line" ;;
+        esac
+    done < bin/flags.txt
+fi
 
 RED='\033[31m'
 GREEN='\033[32m'
@@ -116,8 +131,16 @@ print_splitline "Starting x16-PRos build..."
 
 echo -e "$NC"
 
+# writing flags to bin/flags.txt
+echo "FLAG_FORCE_BOOT_RECOMP=$FLAG_FORCE_BOOT_RECOMP" > bin/flags.txt
+echo "FLAG_FORCE_KERNEL_RECOMP=$FLAG_FORCE_KERNEL_RECOMP" >> bin/flags.txt
+echo "FLAG_NO_LOGO_DISPLAY=$FLAG_NO_LOGO_DISPLAY" >> bin/flags.txt
+echo "FLAG_NO_LOG=$FLAG_NO_LOG" >> bin/flags.txt
+echo "FLAG_NO_LIST_DRIVERS=$FLAG_NO_LIST_DRIVERS" >> bin/flags.txt
+echo "FLAG_NO_AUTOEXEC=$FLAG_NO_AUTOEXEC" >> bin/flags.txt
+
 # Compile bootloader
-if [ $FLAG_NO_BOOT_RECOMP == 0 ]; then
+if [ $FLAG_FORCE_BOOT_RECOMP == 1 ] || [ ! -f bin/BOOT.BIN ] || [  src/bootloader/boot.asm -nt bin/BOOT.BIN ]; then
     print_info "Compiling bootloader (boot.asm => bin/BOOT.BIN)..."
     nasm -f bin src/bootloader/boot.asm -o bin/BOOT.BIN
     check_error "Bootloader compilation failed"
@@ -125,9 +148,16 @@ if [ $FLAG_NO_BOOT_RECOMP == 0 ]; then
 fi
 
 # Compile kernel
-if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
+if [ "$FLAG_FORCE_KERNEL_RECOMP" = 1 ] ||
+   [ ! -f bin/KERNEL.BIN ] ||
+   [ src/kernel/kernel.asm -nt bin/KERNEL.BIN ] ||
+   [ "$FLAG_NO_LOGO_DISPLAY" != "$OLD_FLAG_NO_LOGO_DISPLAY" ] ||
+   [ "$FLAG_NO_LOG" != "$OLD_FLAG_NO_LOG" ] ||
+   [ "$FLAG_NO_LIST_DRIVERS" != "$OLD_FLAG_NO_LIST_DRIVERS" ] ||
+   [ "$FLAG_NO_AUTOEXEC" != "$OLD_FLAG_NO_AUTOEXEC" ]
+then
     addition_flags=""
-    if [ $FLAG_NO_LOGO_DISPLAY == 1 ]; then
+    if [ "$FLAG_NO_LOGO_DISPLAY" = 1 ]; then
         addition_flags="-d NO_LOGO_DISPLAY"
     fi
     if [ $FLAG_NO_LOG == 1 ]; then
@@ -403,7 +433,7 @@ for prog in "${programs_root[@]}"; do
         addition_flags="-d NO_SETUP"
     fi
 
-    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin $src -o bin/$bin_name $addition_flags
         check_error "Compilation of $src failed"
@@ -466,7 +496,7 @@ for prog in "${programs[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin $src -o bin/$bin_name
         check_error "Compilation of $src failed"
@@ -490,7 +520,7 @@ for prog in "${programs_com[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin $src -o bin/$bin_name
         check_error "Compilation of $src failed"
@@ -511,7 +541,7 @@ for prog in "${programs_exe[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin -I programs/EXE/ $src -o bin/$bin_name
         check_error "Compilation of $src failed"
@@ -536,7 +566,7 @@ for prog in "${programs_ple[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin -I programs/PLE/ -I programs/lib/ -I programs/PLE/src/gui/ $src -o bin/$bin_name
         check_error "Compilation of $src failed"
@@ -563,7 +593,7 @@ for prog in "${programs_ple_gui[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin -I programs/PLE/ -I programs/lib/ $src -o bin/$bin_name
         check_error "Compilation of $src failed"
