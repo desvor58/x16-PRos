@@ -30,6 +30,11 @@ main_loop:
     mov ah, 0x01
     int 0x21
 
+    mov ah, 0x05
+    int 0x21
+
+    jmp main_loop
+
 exit:
     mov ah, 0x05
     int 0x21
@@ -38,6 +43,12 @@ exit:
 
 read_input:
     pusha
+
+    mov di, input_buffer
+    xor al, al
+    mov cx, 93
+    cld
+    rep stosb
 
     mov di, input_buffer
     xor cx, cx
@@ -137,25 +148,35 @@ infix_to_postfix:
     sub bx, 1
     mov al, [op_stack + bx]
     stosb
+    mov al, ' '
+    stosb
     dec word [op_stack_top]
     jmp .ops_pull_loop
 
 .exit:
+    xor al, al
+    stosb
     popa
     ret
 
 
 try_get_digit:
     cmp al, '0'
-    jb .exit
+    jb .ret
     cmp al, '9'
-    ja .exit
+    ja .ret
 
 .get_loop:
     stosb
     lodsb
+    cmp al, '0'
+    jb .exit
+    cmp al, '9'
+    ja .exit
+    jmp .get_loop
 
-    jmp try_get_digit
+.ret:
+    ret
 
 .exit:
     push ax
@@ -177,7 +198,7 @@ try_get_lparent:
 
 try_get_rparent:
     cmp al, ')'
-    jnz .exit
+    jnz .end
 
 .pull_ops_loop:
     mov bx, [op_stack_top]
@@ -189,6 +210,8 @@ try_get_rparent:
     jz .exit
 
     stosb
+    mov al, ' '
+    stosb
     dec word [op_stack_top]
     jmp .pull_ops_loop
 
@@ -196,6 +219,7 @@ try_get_rparent:
     mov bx, [op_stack_top]
     test bx, bx
     jz .end
+    sub bx, 1
     mov al, [op_stack + bx]
     cmp al, LPARENT_TOK
     jz .remove_lparent
@@ -227,6 +251,8 @@ try_get_operator:
     cmp bl, bh
     jb .exit
 
+    stosb
+    mov al, ' '
     stosb
     dec word [op_stack_top]
     jmp .pull_ops_loop
