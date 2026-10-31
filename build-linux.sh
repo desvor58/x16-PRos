@@ -42,6 +42,7 @@ OLD_FLAG_NO_LOGO_DISPLAY=-1
 OLD_FLAG_NO_LOG=-1
 OLD_FLAG_NO_LIST_DRIVERS=-1
 OLD_FLAG_NO_AUTOEXEC=-1
+OLD_FLAG_NO_SETUP=-1
 
 if [ -f bin/flags.txt ]; then
     while IFS= read -r line || [ -n "$line" ]; do
@@ -138,6 +139,7 @@ echo "FLAG_NO_LOGO_DISPLAY=$FLAG_NO_LOGO_DISPLAY" >> bin/flags.txt
 echo "FLAG_NO_LOG=$FLAG_NO_LOG" >> bin/flags.txt
 echo "FLAG_NO_LIST_DRIVERS=$FLAG_NO_LIST_DRIVERS" >> bin/flags.txt
 echo "FLAG_NO_AUTOEXEC=$FLAG_NO_AUTOEXEC" >> bin/flags.txt
+echo "FLAG_NO_SETUP=$FLAG_NO_SETUP" >> bin/flags.txt
 
 # Compile bootloader
 if [ $FLAG_FORCE_BOOT_RECOMP == 1 ] || [ ! -f bin/BOOT.BIN ] || [  src/bootloader/boot.asm -nt bin/BOOT.BIN ]; then
@@ -433,7 +435,7 @@ for prog in "${programs_root[@]}"; do
         addition_flags="-d NO_SETUP"
     fi
 
-    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ]; then
+    if [ $FLAG_FORCE_PROGRAMS_RECOMP == 1 ] || [ ! -f bin/$bin_name ] || [ $src -nt bin/$bin_name ] || [ "$FLAG_NO_SETUP" != "$OLD_FLAG_NO_SETUP" ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin $src -o bin/$bin_name $addition_flags
         check_error "Compilation of $src failed"
