@@ -9,9 +9,6 @@
 [ORG 0x8000]
 
 start:
-    mov ah, 0x05
-    int 0x21
-
     mov ah, 0x01
     mov si, welcome_msg
     int 0x21
@@ -34,6 +31,8 @@ main_loop:
     int 0x21
 
 exit:
+    mov ah, 0x05
+    int 0x21
     ret
 
 
@@ -47,7 +46,7 @@ read_input:
     int 0x16
 
     cmp al, 0x1B
-    jz exit
+    jz .esc_exit
     cmp al, 0x08
     jz .backspace
     cmp al, 0x0D
@@ -103,6 +102,11 @@ read_input:
     int 0x10
     jmp .read_loop
 
+.esc_exit:
+    popa
+    add sp, 2
+    jmp exit
+
 
 infix_to_postfix:
     pusha
@@ -128,15 +132,9 @@ infix_to_postfix:
 .done:
 .ops_pull_loop:
     mov bx, [op_stack_top]
-    pusha
-        mov ax, bx
-        call string_int_to_string
-        mov si, ax
-        mov ah, 0x01
-        int 0x21
-    popa
     test bx, bx
     jz .exit
+    sub bx, 1
     mov al, [op_stack + bx]
     stosb
     dec word [op_stack_top]
@@ -185,6 +183,7 @@ try_get_rparent:
     mov bx, [op_stack_top]
     test bx, bx
     jz .exit
+    sub bx, 1
     mov al, [op_stack + bx]
     cmp al, LPARENT_TOK
     jz .exit
@@ -209,17 +208,18 @@ try_get_rparent:
 
 
 try_get_operator:
-    push ax
     call get_op_priority
     test bl, bl
-    jz .exit
+    jz .end
 
+    push ax
     mov bh, bl
 
 .pull_ops_loop:
     mov bp, [op_stack_top]
     test bp, bp
     jz .exit
+    sub bp, 1
     mov al, [op_stack + bp]
     call get_op_priority
     test bl, bl
@@ -233,8 +233,10 @@ try_get_operator:
 
 .exit:
     pop ax
+    mov bp, [op_stack_top]
     mov [op_stack + bp], al
     inc word [op_stack_top]
+.end:
     ret
 
 
@@ -265,7 +267,7 @@ get_op_priority:
     ret
 
 
-welcome_msg db "Big calculator"
+welcome_msg db "Big calculator", 0x0D, 0x0A
             db 'Press [F1] to see help menu', 0x0D, 0x0A
             db 'Press [ESC] to exit', 0x0D, 0x0A, 0
 prompt      db '> ', 0
